@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: jfileserver-wrapper
+server:
+  port: 8088
+
+# jFileServer配置
+jfileserver:
+  # 是否在应用启动时自动启动jFileServer
+  auto-start: true
+  # SMB/CIFS端口
+  port: 47531
+  # 共享目录（支持相对路径和绝对路径）
+  share-path: ./jfileserver/test
+  # 共享名称
+  share-name: JFILESHARE
+  # 服务器名称
+  server-name: JFILESERVER
+  # 域名/工作组
+  domain: FILESRV
+  # 用户名
+  username: admin
+  # 密码
+  password: jfilesrv
+  # 最小线程数
+  min-threads: 5
+  # 最大线程数
+  max-threads: 20
