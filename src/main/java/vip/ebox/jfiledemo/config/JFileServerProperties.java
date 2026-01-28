@@ -70,4 +70,19 @@ public class JFileServerProperties {
      * 最大线程数
      */
     private int maxThreads = 20;
+
+    /**
+     * Socket 超时时间（毫秒）
+     * 0 或负数表示禁用超时，连接不会被自动关闭
+     *
+     * 推荐设置为 0，原因：
+     * 1. 禁用后 IdleSessionReaper（空闲会话清理器）不会启动
+     * 2. 连接将保持稳定，不会因为空闲被自动关闭
+     * 3. 避免长时间操作（如挂载ISO安装系统、大文件传输）时连接断开
+     *
+     * 如果设置为正值（如 900000 = 15分钟）：
+     * - 空闲会话将在 timeout/2 时间后被自动清理
+     * - 例如：设置 900000，空闲 7.5 分钟后连接会被关闭
+     */
+    private int socketTimeout = 0;
 }

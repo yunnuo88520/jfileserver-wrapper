@@ -132,15 +132,28 @@ public class JFileServerService {
                 smbConfig.setServerName(properties.getServerName());
                 smbConfig.setDomainName(properties.getDomain());
 
+                // *** 关键配置：禁用空闲会话清理器，防止连接被自动关闭 ***
+                // socketTimeout 设置为 0 或负数时，IdleSessionReaper 不会启动
+                // 这样可以确保长时间挂载的连接（如ISO镜像安装）不会被断开
+                smbConfig.setSocketTimeout(properties.getSocketTimeout());
+
+                // 检查是否禁用了超时
+                if (properties.getSocketTimeout() <= 0) {
+                    log.info("已禁用 socket 超时，IdleSessionReaper 将不会启动，连接将保持稳定");
+                } else {
+                    log.info("已配置 socket 超时: {} 毫秒（空闲会话将在 {} 毫秒后被清理）",
+                        properties.getSocketTimeout(), properties.getSocketTimeout() / 2);
+                }
+
                 // 配置SMB dialect - 支持SMB1（重要：很多客户端只支持SMB1）
                 DialectSelector dialects = smbConfig.getEnabledDialects();
                 dialects.AddDialect(org.filesys.smb.Dialect.NT);
                 dialects.AddDialect(org.filesys.smb.Dialect.LanMan2);
                 dialects.AddDialect(org.filesys.smb.Dialect.LanMan2_1);
 
-                // 创建并设置认证器 - 使用NTLMOnlySMBAuthenticator以支持NTLMv2
-                NTLMOnlySMBAuthenticator authenticator =
-                    new NTLMOnlySMBAuthenticator();
+                // 创建并设置认证器 - 使用EnterpriseSMBAuthenticator以支持NTLMv2
+                //NTLMOnlySMBAuthenticator authenticator = new NTLMOnlySMBAuthenticator();
+                EnterpriseSMBAuthenticator authenticator = new EnterpriseSMBAuthenticator();
 
                 // 关键：必须手动设置authenticator的配置引用，否则无法获取用户信息
                 authenticator.setConfig(serverConfig);
@@ -148,7 +161,7 @@ public class JFileServerService {
                 authenticator.setAccessMode(SMBAuthenticator.AuthMode.USER);
                 authenticator.setAllowGuest(true);  // 允许guest访问（免密）
                 smbConfig.setAuthenticator(authenticator);
-                log.info("已使用NTLMOnlySMBAuthenticator，支持NTLMv1和NTLMv2认证");
+                log.info("已使用EnterpriseSMBAuthenticator，支持NTLMv1和NTLMv2认证");
 
                 // 启用调试日志以便排查问题
                 smbConfig.setSessionDebugFlags(EnumSet.of(

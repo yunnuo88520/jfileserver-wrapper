@@ -11,7 +11,7 @@ jfileserver:
   # SMB/CIFS端口
   port: 47531
   # 共享目录（支持相对路径和绝对路径）
-  share-path: ./jfileserver/test
+  share-path: ./share
   # 共享名称
   share-name: JFILESHARE
   # 服务器名称
@@ -26,3 +26,7 @@ jfileserver:
   min-threads: 5
   # 最大线程数
   max-threads: 20
+  # Socket 超时时间（毫秒），0 或负数表示禁用超时（推荐）
+  # 禁用后，IdleSessionReaper 不会启动，连接将保持稳定，不会因为空闲被关闭
+  # 这对于长时间操作（如挂载ISO安装系统）非常重要
+  socket-timeout: 0
