@@ -37,11 +37,6 @@ public class JFileServerController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            /*if (!properties.isEnabled()) {
-                result.put("success", false);
-                result.put("message", "jFileServer未启用，请在配置文件中设置jfileserver.enabled=true");
-                return ResponseEntity.badRequest().body(result);
-            }*/
 
             jFileServerService.start();
             result.put("success", true);

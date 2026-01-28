@@ -2,6 +2,8 @@ package vip.ebox.jfiledemo.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.filesys.debug.Debug;
+import org.filesys.debug.LogFileDebug;
 import org.filesys.server.auth.*;
 import org.filesys.server.config.GlobalConfigSection;
 import org.filesys.server.config.ServerConfiguration;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PreDestroy;
 import java.io.File;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.Security;
@@ -43,6 +46,9 @@ public class JFileServerService {
     private ServerConfiguration serverConfig;
     private SMBServer smbServer;
     private final ReentrantLock lock = new ReentrantLock();
+
+    // jFileServer 日志接口
+    private LogFileDebug jFileServerLogger;
 
     // 服务器状态
     private volatile boolean running = false;
@@ -68,6 +74,8 @@ public class JFileServerService {
             log.info("  - 用户名: {}", properties.getUsername());
 
             try {
+                // 0. 配置 jFileServer 日志输出
+                configureJFileServerLogging();
                 // 1. 创建服务器配置
                 serverConfig = new ServerConfiguration(properties.getServerName());
 
@@ -330,6 +338,13 @@ public class JFileServerService {
      */
     private void cleanup() {
         try {
+            // 关闭 jFileServer 日志
+            if (jFileServerLogger != null) {
+                log.info("正在关闭 jFileServer 日志文件...");
+                jFileServerLogger.close();
+                jFileServerLogger = null;
+            }
+
             if (smbServer != null) {
                 log.info("正在关闭SMB服务器...");
                 smbServer.shutdownServer(false);
@@ -345,6 +360,46 @@ public class JFileServerService {
         } catch (Exception e) {
             log.error("清理资源时发生错误", e);
         }
+    }
+
+    /**
+     * 配置 jFileServer 日志输出
+     */
+    private void configureJFileServerLogging() throws IOException {
+        String logPath = properties.getLogFilePath();
+
+        // 如果日志路径为空，则输出到控制台（不配置日志文件）
+        if (logPath == null || logPath.trim().isEmpty()) {
+            log.info("jFileServer 日志将输出到控制台");
+            return;
+        }
+
+        // 确定日志文件路径
+        File logFile;
+        if (new File(logPath).isAbsolute()) {
+            // 绝对路径
+            logFile = new File(logPath);
+        } else {
+            // 相对路径，相对于项目根目录
+            String projectRoot = System.getProperty("user.dir");
+            logFile = new File(projectRoot, logPath);
+        }
+
+        // 确保日志目录存在
+        File logDir = logFile.getParentFile();
+        if (logDir != null && !logDir.exists()) {
+            if (logDir.mkdirs()) {
+                log.info("创建jFileServer日志目录: {}", logDir.getAbsolutePath());
+            }
+        }
+
+        // 创建日志文件输出器（第二个参数 true 表示追加模式）
+        jFileServerLogger = new LogFileDebug(logFile.getAbsolutePath(), properties.isLogAppend());
+
+        // 设置为 jFileServer 的全局日志输出
+        Debug.setDebugInterface(jFileServerLogger);
+
+        log.info("已配置 jFileServer 日志输出到: {}", logFile.getAbsolutePath());
     }
 
     /**

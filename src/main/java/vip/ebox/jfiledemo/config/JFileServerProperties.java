@@ -85,4 +85,22 @@ public class JFileServerProperties {
      * - 例如：设置 900000，空闲 7.5 分钟后连接会被关闭
      */
     private int socketTimeout = 0;
+
+    /**
+     * jFileServer 日志文件路径
+     * 支持相对路径和绝对路径
+     * - 如果为 null 或空字符串，则输出到控制台
+     * - 相对路径相对于项目根目录
+     *
+     * 示例：
+     * - logs/jfileserver.log（相对路径，推荐）
+     * - /var/log/jfileserver/jfileserver.log（绝对路径）
+     * - ""（空字符串，输出到控制台）
+     */
+    private String logFilePath = "logs/jfileserver.log";
+
+    /**
+     * 日志是否追加
+     */
+    private boolean logAppend = true;
 }

@@ -11,7 +11,7 @@ jfileserver:
   # SMB/CIFS端口
   port: 47531
   # 共享目录（支持相对路径和绝对路径）
-  share-path: ./share
+  share-path: share
   # 共享名称
   share-name: JFILESHARE
   # 服务器名称
@@ -30,3 +30,10 @@ jfileserver:
   # 禁用后，IdleSessionReaper 不会启动，连接将保持稳定，不会因为空闲被关闭
   # 这对于长时间操作（如挂载ISO安装系统）非常重要
   socket-timeout: 0
+  # jFileServer 日志文件路径（支持相对路径和绝对路径）
+  # 如果设置为空字符串或 null，则输出到控制台
+  # 相对路径相对于项目根目录
+  log-file-path: logs/jfileserver.log
+  # 日志是否追加
+  # true(默认) 表示追加 false 表示不追加,每次启动覆盖
+  log-append: true
