@@ -54,7 +54,8 @@ SMB/CIFS 协议是企业环境中广泛使用的文件共享协议，但传统�
 - ✅ **线程池管理**：可配置的线程池大小，支持并发连接
 - ✅ **资源管理**：完善的资源清理和优雅关闭机制
 - ✅ **密码加密**：使用 BouncyCastle 进行 MD4 密码哈希
-- ✅ **日志记录**：详细的日志输出，便于问题排查
+- ✅ **日志管理**：支持灵活的日志配置，可输出到控制台或文件
+- ✅ **连接稳定**：可配置禁用会话超时，避免长时间操作中断
 
 ## 🏗️ 技术架构
 
@@ -212,8 +213,32 @@ jfileserver:
   # 最大线程数（默认：100）
   max-threads: 100
 
-  # 允许匿名访问（默认：false）
-  allow-guest: false
+  # Socket 超时时间（毫秒）
+  # 0 或负数表示禁用超时，连接不会被自动关闭
+  # 推荐设置为 0，原因：
+  #   1. 禁用后 IdleSessionReaper（空闲会话清理器）不会启动
+  #   2. 连接将保持稳定，不会因为空闲被自动关闭
+  #   3. 避免长时间操作（如挂载ISO安装系统、大文件传输）时连接断开
+  # 如果设置为正值（如 900000 = 15分钟）：
+  #   - 空闲会话将在 timeout/2 时间后被自动清理
+  #   - 例如：设置 900000，空闲 7.5 分钟后连接会被关闭
+  socket-timeout: 0
+
+  # jFileServer 日志文件路径
+  # 支持相对路径和绝对路径
+  # - 如果为 null 或空字符串，则输出到控制台
+  # - 相对路径相对于项目根目录
+  # 示例：
+  #   - logs/jfileserver.log（相对路径，推荐）
+  #   - /var/log/jfileserver/jfileserver.log（绝对路径）
+  #   - ""（空字符串，输出到控制台）
+  log-file-path: logs/jfileserver.log
+
+  # 日志是否追加
+  # true(默认) 表示追加模式，false 表示覆盖模式
+  # - true: 每次启动日志追加到文件末尾，保留历史日志
+  # - false: 每次启动覆盖原有日志文件
+  log-append: true
 ```
 
 ### 高级配置场景
@@ -264,6 +289,36 @@ jfileserver:
   password: dev123
   min-threads: 2
   max-threads: 10
+```
+
+#### 场景 4：日志配置
+
+**控制台输出日志**（开发调试）：
+```yaml
+jfileserver:
+  log-file-path: ""  # 空字符串，日志输出到控制台
+```
+
+**文件输出日志**（生产环境推荐）：
+```yaml
+jfileserver:
+  log-file-path: logs/jfileserver.log  # 相对路径
+  log-append: true  # 追加模式，保留历史日志
+```
+
+**每次启动清空日志**（每次重启都需要全新日志）：
+```yaml
+jfileserver:
+  log-file-path: /var/log/jfileserver/jfileserver.log  # 绝对路径
+  log-append: false  # 覆盖模式
+```
+
+**生产环境日志配置**（配合 logrotate）：
+```yaml
+jfileserver:
+  log-file-path: /var/log/jfileserver/jfileserver.log
+  log-append: true  # 追加模式，由 logrotate 负责日志轮转
+  socket-timeout: 0  # 禁用超时，保持连接稳定
 ```
 
 ### 配置优先级
@@ -746,9 +801,11 @@ java -jar jfileserver-wrapper.jar
 
 ### Q4: 如何查看日志？
 
-日志输出位置：
-- **控制台**：直接查看应用启动的控制台输出
-- **文件日志**：如需文件日志，需在 `application.yml` 中配置
+本项目有两种日志：
+
+#### 1. Spring Boot 应用日志
+
+包括 jfileserver-wrapper 项目的日志，如启动信息、API 请求等。
 
 **配置文件日志**：
 ```yaml
@@ -759,6 +816,38 @@ logging:
     name: logs/jfileserver-wrapper.log
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+```
+
+#### 2. jFileServer 内部日志
+
+包括 SMB 协议日志、连接日志、认证日志等，以 `[SMB]` 开头。
+
+**配置 jFileServer 日志**：
+```yaml
+jfileserver:
+  # 日志文件路径
+  log-file-path: logs/jfileserver.log
+
+  # 是否追加模式
+  log-append: true  # true=追加, false=覆盖
+```
+
+**查看 jFileServer 日志**：
+```bash
+# 实时查看日志
+tail -f logs/jfileserver.log
+
+# 查看最后 100 行
+tail -n 100 logs/jfileserver.log
+
+# 搜索特定内容
+grep "Session" logs/jfileserver.log
+```
+
+**输出到控制台**：
+```yaml
+jfileserver:
+  log-file-path: ""  # 空字符串，输出到控制台
 ```
 
 ### Q5: 如何更改 SMB 端口？
@@ -826,6 +915,12 @@ curl http://localhost:8088/api/jfileserver/status
 # 启动时添加调试参数
 java -Dlogging.level.vip.ebox.jfiledemo=DEBUG \
      -jar jfileserver-wrapper.jar
+
+# 查看 jFileServer 日志
+tail -f logs/jfileserver.log
+
+# 搜索错误信息
+grep -i "error\|exception" logs/jfileserver.log
 ```
 
 **3. 测试网络连接**
@@ -1045,8 +1140,32 @@ ExecStart=/usr/bin/java -jar /opt/jfileserver-wrapper/jfileserver-wrapper-1.0.0.
 Restart=on-failure
 RestartSec=10
 
+# 环境变量 - 可选：配置日志路径
+Environment="JFILESERVER_LOGFILE_PATH=/var/log/jfileserver/jfileserver.log"
+Environment="JFILESERVER_LOGAPPEND=true"
+
 [Install]
 WantedBy=multi-user.target
+```
+
+**配置 logrotate**（推荐生产环境）：
+
+创建 `/etc/logrotate.d/jfileserver`：
+
+```
+/var/log/jfileserver/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 your-user your-group
+    sharedscripts
+    postrotate
+        systemctl reload jfileserver > /dev/null 2>&1 || true
+    endscript
+}
 ```
 
 启用服务：
@@ -1055,6 +1174,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable jfileserver
 sudo systemctl start jfileserver
 sudo systemctl status jfileserver
+
+# 查看 jFileServer 日志
+sudo tail -f /var/log/jfileserver/jfileserver.log
 ```
 
 ## 🤝 贡献指南
