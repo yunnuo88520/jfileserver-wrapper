@@ -338,16 +338,23 @@ public class JFileServerService {
      */
     private void cleanup() {
         try {
-            // 关闭 jFileServer 日志
-            if (jFileServerLogger != null) {
-                log.info("正在关闭 jFileServer 日志文件...");
-                jFileServerLogger.close();
-                jFileServerLogger = null;
-            }
-
             if (smbServer != null) {
                 log.info("正在关闭SMB服务器...");
                 smbServer.shutdownServer(false);
+
+                // 等待 SMB 服务器完全关闭，避免后台线程继续写日志
+                int waitCount = 0;
+                while (smbServer.isActive() && waitCount < 50) {
+                    Thread.sleep(100);
+                    waitCount++;
+                }
+
+                if (waitCount >= 50) {
+                    log.warn("SMB 服务器关闭超时，强制继续清理");
+                } else {
+                    log.info("SMB 服务器已完全关闭");
+                }
+
                 smbServer = null;
             }
 
@@ -355,6 +362,18 @@ public class JFileServerService {
                 log.info("正在关闭服务器配置...");
                 serverConfig.closeConfiguration();
                 serverConfig = null;
+            }
+
+            // 关闭 jFileServer 日志文件
+            // 注意：必须在 SMB 服务器和配置完全关闭后再关闭日志
+            // 否则 SMB 关闭过程中的日志写入会因 m_out=null 而抛出 NullPointerException
+            if (jFileServerLogger != null) {
+                log.info("正在关闭 jFileServer 日志文件...");
+                jFileServerLogger.close();
+                jFileServerLogger = null;
+
+                // 重置 Debug 接口为 null，后续日志将输出到控制台
+                Debug.setDebugInterface(null);
             }
 
         } catch (Exception e) {
